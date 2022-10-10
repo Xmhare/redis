@@ -99,7 +99,7 @@ typedef struct dictht {
 typedef struct dict {
     dictType *type;
     void *privdata;
-    /** 存储了两张哈希表，一般只用到表[1],表[2]用于rehash/**/
+    /** 存储了两张哈希表，一般只用到表[1],表[2]用于rehash **/
     dictht ht[2];
     long rehashidx; /* rehashing not in progress if rehashidx == -1 表示rehash的进度，-1则没有进行rehash*/
     int16_t pauserehash; /* If >0 rehashing is paused (<0 indicates coding error) */
