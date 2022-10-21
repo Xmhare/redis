@@ -519,8 +519,8 @@ typedef enum {
  * free the object.
  *
  * Inside the RDB file, module types are encoded as OBJ_MODULE followed
- * by a 64 bit module type ID, which has a 54 bits module-specific signature
- * in order to dispatch the loading to the right module, plus a 10 bits
+ * by a 64 bit module type ID, which has a 54 bits module-specific signature（签名）
+ * in order to dispatch（调度） the loading to the right module, plus a 10 bits
  * encoding version. */
 #define OBJ_MODULE 5    /* Module object. */
 #define OBJ_STREAM 6    /* Stream object. */
@@ -652,16 +652,26 @@ typedef struct RedisModuleDigest {
 /* Objects encoding. Some kind of objects like Strings and Hashes can be
  * internally represented in multiple ways. The 'encoding' field of the object
  * is set to one of this fields for this object. */
+/** SDS（动态字符串）编码，用于string数据结构类型 **/
 #define OBJ_ENCODING_RAW 0     /* Raw representation */
+/** 整数编码，用于string数据结构类型 **/
 #define OBJ_ENCODING_INT 1     /* Encoded as integer */
+/** 散列表编码，用于hash数据结构类型 **/
 #define OBJ_ENCODING_HT 2      /* Encoded as hash table */
 #define OBJ_ENCODING_ZIPMAP 3  /* Encoded as zipmap */
+/** 双向列表编码，用于list数据结构类型,已舍弃 **/
 #define OBJ_ENCODING_LINKEDLIST 4 /* No longer used: old list encoding. */
+/** 压缩列表编码，用于hash、list、zset数据结构类型 **/
 #define OBJ_ENCODING_ZIPLIST 5 /* Encoded as ziplist */
+/** 整数集合编码，用于set数据结构类型 **/
 #define OBJ_ENCODING_INTSET 6  /* Encoded as intset */
+/** 跳跃表编码，用于zset数据结构类型 **/
 #define OBJ_ENCODING_SKIPLIST 7  /* Encoded as skiplist */
+/** 优化内存分配字符串编码，用于string数据结构类型 **/
 #define OBJ_ENCODING_EMBSTR 8  /* Embedded sds string encoding */
+/** 快速链表编码，用于list数据结构类型 **/
 #define OBJ_ENCODING_QUICKLIST 9 /* Encoded as linked list of ziplists */
+
 #define OBJ_ENCODING_STREAM 10 /* Encoded as a radix tree of listpacks */
 
 #define LRU_BITS 24
@@ -671,13 +681,38 @@ typedef struct RedisModuleDigest {
 #define OBJ_SHARED_REFCOUNT INT_MAX     /* Global object never destroyed. */
 #define OBJ_STATIC_REFCOUNT (INT_MAX-1) /* Object allocated in the stack. */
 #define OBJ_FIRST_SPECIAL_REFCOUNT OBJ_STATIC_REFCOUNT
+/**
+ *
+ * - unsigned type:4; 此处使用到了「位域」，即为了节省空间，使用二进制位的方式存储数据，如此处只占1个字节的前4位
+ * - 所有存储的数据使用此结构体封装
+ */
 typedef struct redisObject {
+    /**
+     * 对象类型：主要支持5中类型string、hash、list、set、zset
+     * 可使用type {key}命令查看值对象类型
+     * **/
     unsigned type:4;
+    /** 内部编码类型：表示内部采用那种数据结构实现**/
     unsigned encoding:4;
+    /**
+     * LRU计时时钟：记录对象最后一次被访问的时间
+     * 当配置了maxmemory 和maxmemory-policy=volatile-lru ｜ allkeys-lru时，可用于辅助LRU算法删除键数据
+     * 可使用object idletime {key} 命令在不更新lru字段情况下查看当前键的空闲时间
+     * 可使用scan object idletime 命令批量查询哪些键长时间空闲未被访问
+     * **/
     unsigned lru:LRU_BITS; /* LRU time (relative to global lru_clock) or
-                            * LFU data (least significant 8 bits frequency
+                            * LFU data (least significant（有效） 8 bits frequency（频率/次数）
                             * and most significant 16 bits access time). */
+    /**
+     * 引用计数器：记录当前对象被引用次数，用于通过引用次数回收内存
+     * 当=0时，可以安全h回收当前对象空间
+     * 可使用object refcount {key} 命令获取当前对象引用
+     * 当对象为整数且范围在[0-9999]时，使用共享对象方式节省内存
+     * **/
     int refcount;
+    /**
+     * 数据指针：整数则直接存储数据，否则表示指向数据的指针
+     * **/
     void *ptr;
 } robj;
 

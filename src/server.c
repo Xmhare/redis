@@ -1404,6 +1404,9 @@ dictType zsetDictType = {
     NULL                       /* allow to expand */
 };
 
+/**
+ * 这里是给dictType结构体赋值,类似java中调用类的构造函数？
+ */
 /* Db->dict, keys are sds strings, vals are Redis objects. */
 dictType dbDictType = {
     dictSdsHash,                /* hash function */

@@ -210,6 +210,12 @@ sds sdsdup(const sds s) {
 /* Free an sds string. No operation is performed if 's' is NULL. */
 void sdsfree(sds s) {
     if (s == NULL) return;
+    /** 获取sds首地址
+     * s的地址实际上是sdshdr中buf所在的地址
+     * s[-1] 表示sdshdr中的flag地址
+     * sdsHdrSize 则表示头部长度
+     * 故实际首地址等于s地址-头部长度
+     * **/
     s_free((char*)s-sdsHdrSize(s[-1]));
 }
 

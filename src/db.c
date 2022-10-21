@@ -186,10 +186,10 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
     return o;
 }
 
-/* Add the key to the DB. It's up to the caller to increment the reference
+/* Add the key to the DB. It's up to（由...决定） the caller to increment the reference
  * counter of the value if needed.
  *
- * The program is aborted if the key already exists. */
+ * The program is aborted（中止） if the key already exists. */
 void dbAdd(redisDb *db, robj *key, robj *val) {
     sds copy = sdsdup(key->ptr);
     int retval = dictAdd(db->dict, copy, val);

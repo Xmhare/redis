@@ -145,9 +145,11 @@ robj *tryCreateStringObject(const char *ptr, size_t len) {
  * integer, because the object is going to be used as value in the Redis key
  * space (for instance when the INCR command is used), so we want LFU/LRU
  * values specific for each key. */
+/** 对长整型数据进一步做编码处理**/
 robj *createStringObjectFromLongLongWithOptions(long long value, int valueobj) {
     robj *o;
 
+    /**作为公共方法，此处需要再次判断是否可以使用共享池对象存储**/
     if (server.maxmemory == 0 ||
         !(server.maxmemory_policy & MAXMEMORY_FLAG_NO_SHARED_INTEGERS))
     {
@@ -254,6 +256,10 @@ robj *createIntsetObject(void) {
     return o;
 }
 
+/**
+ * 创建哈希结构对象
+ * 默认使用压缩列表ziplist编码格式
+ */
 robj *createHashObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_HASH, zl);
@@ -435,9 +441,17 @@ void trimStringObjectIfNeeded(robj *o) {
 }
 
 /* Try to encode a string object in order to save space */
+/**
+ * 字符串编码优化
+ * raw： 动态字符串编码
+ * embstr： 优化内存分配的字符串编码
+ * int： 整数编码
+ * @param o
+ * @return
+ */
 robj *tryObjectEncoding(robj *o) {
     long value;
-    sds s = o->ptr;
+    sds s = o->ptr;//获取数值对应的数据
     size_t len;
 
     /* Make sure this is a string object, the only type we encode
@@ -449,33 +463,45 @@ robj *tryObjectEncoding(robj *o) {
     /* We try some specialized encoding only for objects that are
      * RAW or EMBSTR encoded, in other words objects that are still
      * in represented by an actually array of chars. */
+    /** 检查编码类型是否是raw 或者 embstr,如果不是则直接返回**/
     if (!sdsEncodedObject(o)) return o;
 
     /* It's not safe to encode shared objects: shared objects can be shared
      * everywhere in the "object space" of Redis and may end in places where
      * they are not handled. We handle them only as values in the keyspace. */
+    /** 检查是否是共享池对象，通过被引用次数来判断其是否被共享，共享对象不再做编码优化**/
      if (o->refcount > 1) return o;
 
     /* Check if we can represent this string as a long integer.
      * Note that we are sure that a string larger than 20 chars is not
      * representable as a 32 nor 64 bit integer. */
+    /** 检查是否可以存储为长整型，大于20字节将不能作为32位或64位的整数处理 **/
     len = sdslen(s);
     if (len <= 20 && string2l(s,len,&value)) {
         /* This object is encodable as a long. Try to use a shared object.
          * Note that we avoid using shared integers when maxmemory is used
          * because every object needs to have a private LRU field for the LRU
-         * algorithm to work well. */
+         * algorithm（算法） to work well. */
+        /**
+         * 尝试使用共享对象池
+         * 共享对象池大小数据范围小于OBJ_SHARED_INTEGERS（10000），即[0,9999]
+         * 共享对象池不可用于LRU和LFU内存策略，因为此两种策略需要获取对象被访问的最后时间，使用了共享将无法准确获取每一个对象最后的访问时间
+         * **/
         if ((server.maxmemory == 0 ||
             !(server.maxmemory_policy & MAXMEMORY_FLAG_NO_SHARED_INTEGERS)) &&
             value >= 0 &&
             value < OBJ_SHARED_INTEGERS)
         {
+            /** 释放数据与内存空间**/
             decrRefCount(o);
+            /** 对value值增加引用次数 **/
             incrRefCount(shared.integers[value]);
             return shared.integers[value];
         } else {
             if (o->encoding == OBJ_ENCODING_RAW) {
+                /** 释放value内存空间**/
                 sdsfree(o->ptr);
+                /** 定义编码类型为整数编码**/
                 o->encoding = OBJ_ENCODING_INT;
                 o->ptr = (void*) value;
                 return o;

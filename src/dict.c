@@ -3,7 +3,7 @@
  * This file implements in memory hash tables with insert/del/replace/find/
  * get-random-element operations. Hash tables will auto resize if needed
  * tables of power of two in size are used, collisions are handled by
- * chaining. See the source code for more information... :)
+ * chaining(链接). See the source code for more information... :)
  *
  * Copyright (c) 2006-2012, Salvatore Sanfilippo <antirez at gmail dot com>
  * All rights reserved.
@@ -56,6 +56,7 @@
  * prevented: a hash table is still allowed to grow if the ratio between
  * the number of elements and the buckets > dict_force_resize_ratio. */
 static int dict_can_resize = 1;
+/**字典大小重分配：设置为0时不允许，若是小于buckets大小，则可重新调整**/
 static unsigned int dict_force_resize_ratio = 5;
 
 /* -------------------------- private prototypes ---------------------------- */
@@ -95,6 +96,7 @@ uint64_t dictGenCaseHashFunction(const unsigned char *buf, int len) {
 
 /* Reset a hash table already initialized with ht_init().
  * NOTE: This function should only be called by ht_destroy(). */
+/** 字典重置或者初始化 **/
 static void _dictReset(dictht *ht)
 {
     ht->table = NULL;
@@ -109,6 +111,7 @@ dict *dictCreate(dictType *type,
 {
     dict *d = zmalloc(sizeof(*d));
 
+    /** 初始化字典 **/
     _dictInit(d,type,privDataPtr);
     return d;
 }
@@ -117,6 +120,7 @@ dict *dictCreate(dictType *type,
 int _dictInit(dict *d, dictType *type,
         void *privDataPtr)
 {
+    /** 初始化哈希表 **/
     _dictReset(&d->ht[0]);
     _dictReset(&d->ht[1]);
     d->type = type;
@@ -303,7 +307,7 @@ int dictAdd(dict *d, void *key, void *val)
  * dictEntry structure to the user, that will make sure to fill the value
  * field as they wish.
  *
- * This function is also directly exposed to the user API to be called
+ * This function is also directly exposed（暴露） to the user API to be called
  * mainly in order to store non-pointers inside the hash value, example:
  *
  * entry = dictAddRaw(dict,mykey,NULL);
@@ -314,7 +318,7 @@ int dictAdd(dict *d, void *key, void *val)
  * If key already exists NULL is returned, and "*existing" is populated
  * with the existing entry if existing is not NULL.
  *
- * If key was added, the hash entry is returned to be manipulated by the caller.
+ * If key was added, the hash entry is returned to be manipulated（操纵） by the caller.
  */
 dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
 {
@@ -972,7 +976,7 @@ unsigned long dictScan(dict *d,
 
 /* ------------------------- private functions ------------------------------ */
 
-/* Because we may need to allocate huge memory chunk at once when dict
+/* Because we may need to allocate（分配） huge memory chunk（块） at once when dict
  * expands, we will check this allocation is allowed or not if the dict
  * type has expandAllowed member function. */
 static int dictTypeExpandAllowed(dict *d) {

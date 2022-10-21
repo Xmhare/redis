@@ -488,7 +488,7 @@ void afterErrorReply(client *c, const char *s, size_t len) {
 }
 
 /* The 'err' object is expected to start with -ERRORCODE and end with \r\n.
- * Unlike addReplyErrorSds and others alike which rely on addReplyErrorLength. */
+ * Unlike addReplyErrorSds and others alike which rely（依赖） on addReplyErrorLength. */
 void addReplyErrorObject(client *c, robj *err) {
     addReply(c, err);
     afterErrorReply(c, err->ptr, sdslen(err->ptr)-2); /* Ignore trailing \r\n */

@@ -37,6 +37,13 @@
 /* Check the length of a number of objects to see if we need to convert a
  * ziplist to a real hash. Note that we only check string encoded objects
  * as their string length can be queried in constant time. */
+/**
+ * 根据长度判断是使用ziplist结构还是使用哈希存储
+ * @param o
+ * @param argv
+ * @param start
+ * @param end
+ */
 void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
     int i;
     size_t sum = 0;
@@ -47,6 +54,9 @@ void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
         if (!sdsEncodedObject(argv[i]))
             continue;
         size_t len = sdslen(argv[i]->ptr);
+        /* hash_max_ziplist_value = size_t = __darwin_size_t = typedef unsigned long
+         * unsigned long 32位是4个字节，64位是8个字节，本地运行位64位，故结果为8*8（一个字节占8bit）=64
+         * */
         if (len > server.hash_max_ziplist_value) {
             hashTypeConvert(o, OBJ_ENCODING_HT);
             return;
@@ -207,6 +217,7 @@ int hashTypeExists(robj *o, sds field) {
 int hashTypeSet(robj *o, sds field, sds value, int flags) {
     int update = 0;
 
+    /** 小于1G时用压缩表来实现**/
     if (o->encoding == OBJ_ENCODING_ZIPLIST) {
         unsigned char *zl, *fptr, *vptr;
 
@@ -656,18 +667,29 @@ void hsetnxCommand(client *c) {
     }
 }
 
+/**
+ * 指令参数共有4个： hset key field value
+ * argc： 参数个数
+ * argv： 参数数组
+ *
+ * @param c
+ */
 void hsetCommand(client *c) {
     int i, created = 0;
     robj *o;
 
+    /** argc: 当前命令的参数个数(包含命令指令) **/
     if ((c->argc % 2) == 1) {
         addReplyErrorFormat(c,"wrong number of arguments for '%s' command",c->cmd->name);
         return;
     }
 
+    /** argv: 当前命令传入的参数数组，其第二个即为key，此处是对key处理存储 **/
     if ((o = hashTypeLookupWriteOrCreate(c,c->argv[1])) == NULL) return;
+    /** 对键值对类型、编码、长度等进行判断初始化，每一个参数对应一个redisObject对象 **/
     hashTypeTryConversion(o,c->argv,2,c->argc-1);
 
+    /** field-value（键值对处理）下标为2即第三个开始即为键值对 **/
     for (i = 2; i < c->argc; i += 2)
         created += !hashTypeSet(o,c->argv[i]->ptr,c->argv[i+1]->ptr,HASH_SET_COPY);
 

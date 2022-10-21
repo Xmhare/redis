@@ -52,35 +52,43 @@
  */
 typedef struct dictEntry {
 
-    /**
-     * 键值对中的键
-     */
+    /** 键值对中的键 **/
     void *key;
     /**
      * 键值对中的值
      * 共用体，内部成员共用一段内存，同一时刻只能保存一个成员数值
-     * 此处代表了字典可存储的4种数值的类型，分别是字符串、无符号正数、有符号正数、双精度类型
-     * **/
+     * 此处代表了字典可存储的4种数类型：指针、无符号整数、有符号整数、双精度等类型
+     */
     union {
         void *val;
         uint64_t u64;
         int64_t s64;
         double d;
     } v;
-    /**指向下一个哈希表的节点，形成链表**/
+    /**指向下一个哈希节点，形成链表，以此来解决键冲突的问题，即链表法**/
     struct dictEntry *next;
 } dictEntry;
 
 /**
- * todo 此处语法没看懂
+ * 类型特定函数，表示字典中特定的函数方法
+ * - (*function) 函数指针
+ * - *(*function) 函数指针的指针
+ * @see server.c 中的dbDictType定义的函数与具体实现
  * **/
 typedef struct dictType {
+    /** hash函数 为key生成hash **/
     uint64_t (*hashFunction)(const void *key);
+    /** key的复制函数 **/
     void *(*keyDup)(void *privdata, const void *key);
+    /** value的复制函数 **/
     void *(*valDup)(void *privdata, const void *obj);
+    /** key的比较函数 **/
     int (*keyCompare)(void *privdata, const void *key1, const void *key2);
+    /** key的销毁函数 **/
     void (*keyDestructor)(void *privdata, void *key);
+    /** value的销毁函数 **/
     void (*valDestructor)(void *privdata, void *obj);
+    /** 字典拓展时是否允许内存分配函数**/
     int (*expandAllowed)(size_t moreMem, double usedRatio);
 } dictType;
 
@@ -88,20 +96,33 @@ typedef struct dictType {
  * implement incremental rehashing, for the old to the new table. */
 /**
  * 哈希表结构
+ * - dictEntry 表明指针指向的数据类型是哈希节点结构
+ * - **table 二级指针，表明table是一个指向指针的指针 从而组合成了一个数组
  * **/
 typedef struct dictht {
+    /** 哈希表数组 **/
     dictEntry **table;
+    /** 哈希表大小，是2的整数次幂 **/
     unsigned long size;
+    /** 哈希表大小掩码，用于计算索引值，总是等于size != 0 时 size-1，通过表达式(hash & sizemask)即可计算出所属的槽**/
     unsigned long sizemask;
+    /** 哈希表已有节点数量**/
     unsigned long used;
 } dictht;
 
+/**
+ * 字典结构
+ */
 typedef struct dict {
+    /** 指向类型特定函数的指针，内部保存了一簇用于操作特定类型键值对的函数 **/
     dictType *type;
+    /** 私有数据，保存了需要传给那些类型特定函数的可选参数**/
     void *privdata;
-    /** 存储了两张哈希表，一般只用到表[1],表[2]用于rehash **/
+    /** 两张哈希表，真正使用的是ht[0],ht[1]用于rehash 此实现的是增量rehash，避免了一次rehash耗时过长而产生阻塞**/
     dictht ht[2];
-    long rehashidx; /* rehashing not in progress if rehashidx == -1 表示rehash的进度，-1则没有进行rehash*/
+    /** rehash索引，用于记录rehash的进度，当为-1时，表明不在进行rehash **/
+    long rehashidx; /* rehashing not in progress if rehashidx == -1 */
+    /** 记录当前rehash迭代次数 **/
     int16_t pauserehash; /* If >0 rehashing is paused (<0 indicates coding error) */
 } dict;
 
@@ -110,14 +131,24 @@ typedef struct dict {
  * iterating. Otherwise it is a non safe iterator, and only dictNext()
  * should be called while iterating. */
 /**
+ * 字典迭代器结构
  * safe = 1 线程安全，迭代过程可以执行任何操作
  * safe = 0 线程不安全，只允许dictNext方法执行
  */
 typedef struct dictIterator {
+    /** 字典指针**/
     dict *d;
+    /** 索引 **/
     long index;
+    /** table为dictht的索引为0或1，safe表示是否需要安全遍历**/
     int table, safe;
+    /** 当前节点与下一个节点 **/
     dictEntry *entry, *nextEntry;
+    /**
+     * 非安全遍历时检测是否非法使用的状态值（64位整数）
+     * 非安全迭代器初始化时计算该值
+     * 释放迭代器时在此计算并比较该值，若不同则说明存在非法操作
+     */
     /* unsafe iterator fingerprint for misuse detection. */
     long long fingerprint;
 } dictIterator;

@@ -163,13 +163,29 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
  * Function takes pointers to client, flags, unit, pointer to pointer of expire obj if needed
  * to be determined and command_type which can be COMMAND_GET or COMMAND_SET.
  *
- * If there are any syntax violations C_ERR is returned else C_OK is returned.
+ * If there are any syntax（句法） violations（违反） C_ERR is returned else C_OK is returned.
  *
- * Input flags are updated upon parsing the arguments. Unit and expire are updated if there are any
+ * Input flags are updated upon（在...之上） parsing the arguments. Unit and expire are updated if there are any
  * EX/EXAT/PX/PXAT arguments. Unit is updated to millisecond if PX/PXAT is set.
+ */
+/**
+ * 检查选项参数，并设置选项参数flag、expire、unit等状态，参数不匹配返回-1，否则返回0
+ * 6.0以后set指令添加了get、keepttl、exat、pxat等4个选项
+ *
+ * @param c
+ * @param flags
+ * @param unit
+ * @param expire
+ * @param command_type
+ * @return
  */
 int parseExtendedStringArgumentsOrReply(client *c, int *flags, int *unit, robj **expire, int command_type) {
 
+    /**
+     * get: argv表示参数数组其前两个是指令+key，后面才是其他参数选项，下标为2
+     * set: argv表示参数数组其前三个是指令+key+value，后面才是其他参数选项，下标为3
+     *
+     * **/
     int j = command_type == COMMAND_GET ? 2 : 3;
     for (; j < c->argc; j++) {
         char *opt = c->argv[j]->ptr;
@@ -245,6 +261,7 @@ int parseExtendedStringArgumentsOrReply(client *c, int *flags, int *unit, robj *
             *expire = next;
             j++;
         } else {
+            /**处理具体错误信息： ERR syntax error**/
             addReplyErrorObject(c,shared.syntaxerr);
             return C_ERR;
         }
@@ -259,10 +276,12 @@ void setCommand(client *c) {
     int unit = UNIT_SECONDS;
     int flags = OBJ_NO_FLAGS;
 
+    /** 解析并检查set指令的参数选项是否合法，并设置相关状态 **/
     if (parseExtendedStringArgumentsOrReply(c,&flags,&unit,&expire,COMMAND_SET) != C_OK) {
         return;
     }
 
+    /** 尝试对string类型数值进行编码优化，以节省内存空间，下标位2的参数表示的是value数值 **/
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
 }
